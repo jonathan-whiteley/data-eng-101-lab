@@ -1,0 +1,2 @@
+-- demo_refresh_bronze.sql
+-- TODO: Add REFRESH STREAMING TABLE statements for the bronze layer

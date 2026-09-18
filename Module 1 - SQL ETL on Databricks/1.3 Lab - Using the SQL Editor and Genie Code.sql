@@ -1,0 +1,764 @@
+-- Databricks notebook source
+-- MAGIC %md
+-- MAGIC ![DB Academy](../Includes/images/db-academy.png)
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # 1.3 Lab - Using the SQL Editor and Genie Code
+-- MAGIC
+-- MAGIC ## Overview
+-- MAGIC In this lab you will put the SQL Editor to work. You will navigate Unity Catalog to find a volume path, write a query by hand, then generate a query using Genie Code to see the difference in effort. Finally, you will fix a broken Materialized View using Genie Code and explore it in Unity Catalog and the Pipelines UI. Bonus challenges and a SQL Editor scavenger hunt are included at the bottom for those who finish early.
+-- MAGIC
+-- MAGIC #### Duration: ~10 Minutes
+-- MAGIC
+-- MAGIC ## Learning Objectives
+-- MAGIC - Navigate Unity Catalog to locate a volume path and write a `read_files()` query manually
+-- MAGIC - Use **Genie Code** **Generate** (Cmd+I) to build a multi-table join with aggregation from a natural-language prompt
+-- MAGIC - Use **Genie Code** **Quick Fix** and **Diagnose Error** to fix a broken Materialized View
+-- MAGIC - Explore a Materialized View in **Unity Catalog** (Overview, Lineage) and find its auto-created pipeline
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC ## REQUIRED - SELECT A COMPUTE ENVIRONMENT
+-- MAGIC
+-- MAGIC <div style="
+-- MAGIC   border-left: 4px solid #f44336;
+-- MAGIC   background: #ffebee;
+-- MAGIC   padding: 14px 18px;
+-- MAGIC   border-radius: 4px;
+-- MAGIC   margin: 16px 0;
+-- MAGIC ">
+-- MAGIC   <strong style="display:block; color:#c62828; margin-bottom:6px; font-size: 1.1em;">Select SQL Warehouse</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC
+-- MAGIC Before starting this notebook, select the required compute environment listed below.
+-- MAGIC
+-- MAGIC - **SQL Warehouse**
+-- MAGIC
+-- MAGIC **NOTE:** This notebook was **developed and tested using a Serverless SQL Warehouse**. Other compute options may work but are not guaranteed to behave the same or support all features demonstrated.
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="
+-- MAGIC   border-left: 4px solid #1976d2;
+-- MAGIC   background: #e3f2fd;
+-- MAGIC   padding: 14px 18px;
+-- MAGIC   border-radius: 4px;
+-- MAGIC   margin: 16px 0;
+-- MAGIC ">
+-- MAGIC   <strong style="display:block; color:#0d47a1; margin-bottom:6px; font-size: 1.1em;">Want to Keep Going? Bonus Content at the Bottom!</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     Sections <strong>A through E</strong> are the core lab. If you finish and want to explore further, scroll down to find:
+-- MAGIC     <ul style="margin: 8px 0 4px 0;">
+-- MAGIC       <li><strong>Section F — Bonus Challenges:</strong> Three hands-on SQL puzzles you can solve by writing queries yourself or using Genie Code prompts</li>
+-- MAGIC       <li><strong>Section G — SQL Editor Scavenger Hunt:</strong> A guided tour of SQL Editor features you might not have discovered yet</li>
+-- MAGIC     </ul>
+-- MAGIC     These are completely optional — they are there for anyone who wants extra practice or is curious to dig deeper. No pressure at all.
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## A. REQUIRED - Classroom Setup
+
+-- COMMAND ----------
+
+-- MAGIC %run ../Includes/Classroom-Setup-1.3-Lab
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## B. Write a Query Manually - Navigate Unity Catalog for the Volume Path
+-- MAGIC
+-- MAGIC Your course dataset includes raw CSV files stored in a **Unity Catalog Volume**. In this exercise, you will navigate the Catalog Explorer to find the volume path, then write a `read_files()` query by hand in the SQL Editor.
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 1 — Open the SQL Editor</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>In the left sidebar, <strong>right-click SQL Editor</strong> and select <strong>Open in new tab</strong> so you can follow along in both the notebook and the editor.</li>
+-- MAGIC       <li>Click the <strong>+</strong> button next to the tab name and select <strong>New Query</strong>.</li>
+-- MAGIC       <li>Set the <strong>Catalog</strong> to your <code>labuser_XXXXX</code> catalog using the toolbar picker (leave the schema as <code>default</code>). <em>Your unique catalog name was printed in the setup cell output above &mdash; it will be something like <code>labuser_12345</code>.</em></li>
+-- MAGIC     </ol>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 2 — Find the Volume Path in Catalog Explorer</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>In the left sidebar, <strong>right-click Catalog</strong> and select <strong>Open in new tab</strong> to open the Catalog Explorer alongside your notebook.</li>
+-- MAGIC       <li>Navigate to: <strong>your catalog</strong> &rarr; <strong>data</strong> schema &rarr; <strong>Volumes</strong> &rarr; <strong>course_data</strong>.</li>
+-- MAGIC       <li>Inside the <code>course_data</code> volume, find the <strong>raw_products</strong> folder and click on it.</li>
+-- MAGIC       <li>You will see the volume path displayed at the top of the file browser, for example:<br/>
+-- MAGIC         <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">/Volumes/labuser_XXXXX/data/course_data/raw_products</code> &nbsp; <img src="../Includes/images/icons/copy.png" height="16" style="vertical-align:middle;"><br/>
+-- MAGIC         Click the <strong>copy icon</strong> (<img src="../Includes/images/icons/copy.png" height="16" style="vertical-align:middle;">) next to the path to copy it to your clipboard.</li>
+-- MAGIC     </ol>
+-- MAGIC     <p><strong>Paste the path you copied into the cell below</strong> so you have it handy for the next step.</p>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Paste Your Volume Path</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     Paste your volume path below (replace the placeholder), then run the cell to confirm it.
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+SELECT '<PASTE_YOUR_VOLUME_PATH_HERE>' AS my_volume_path
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 3 — Write the Query Manually in the SQL Editor</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <p>Now switch to the <strong>SQL Editor</strong> tab and write a query that reads the raw product CSV files directly from the volume.</p>
+-- MAGIC     <p>The function you need is <code>read_files()</code>. It takes:</p>
+-- MAGIC     <ol>
+-- MAGIC       <li>A <strong>volume path</strong> &mdash; the path you just pasted above</li>
+-- MAGIC       <li><code>format =&gt; 'csv'</code> &mdash; tells the engine the files are CSV</li>
+-- MAGIC       <li><code>header =&gt; 'true'</code> &mdash; the first row contains column names</li>
+-- MAGIC     </ol>
+-- MAGIC     <p>Use <code>SELECT *</code> to return all columns. Once you have written the query, click <strong>Run all</strong>.</p>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <details>
+-- MAGIC   <summary style="cursor: pointer; list-style: none; user-select: none;">
+-- MAGIC     <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 16px 20px; border-radius: 4px; margin: 16px 0">
+-- MAGIC       <div style="display: flex; align-items: center; gap: 12px">
+-- MAGIC         <span style="font-size: 20px;">&#x25B6;</span>
+-- MAGIC         <strong style="color: #00695c; font-size: 1.1em;">Expand for Help</strong>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </summary>
+-- MAGIC   <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 0 20px 16px 20px; border-radius: 0 0 4px 4px; margin: -16px 0 16px 0">
+-- MAGIC     <div style="display: flex; align-items: flex-start; gap: 12px">
+-- MAGIC       <span style="font-size: 20px; visibility: hidden;">&#x25B6;</span>
+-- MAGIC       <div>
+-- MAGIC         <strong style="color: #00695c;">Suggested Query</strong>
+-- MAGIC         <p style="color: #333; margin: 8px 0;">Copy the query below into the SQL Editor. Replace <code style="background: #ffeb3b; color: #333; padding: 2px 6px; border-radius: 3px; font-weight: bold;">PASTE_YOUR_VOLUME_PATH_HERE</code> with the volume path you pasted in the cell above.</p>
+-- MAGIC         <button onclick="copyExpandBlock()" style="margin: 8px 0; padding: 6px 14px; background: #00796b; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Copy to clipboard</button>
+-- MAGIC         <pre id="expand-copy-block" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; border:1px solid #00897b; border-radius:10px; background:#1B3139; color:#E8E3DC; padding:14px 16px; font-size:0.85rem; line-height:1.5; white-space:pre;"><code>SELECT *
+-- MAGIC FROM read_files(
+-- MAGIC   '<span style="background: #ffeb3b; color: #333; padding: 1px 4px; border-radius: 2px; font-weight: bold;">PASTE_YOUR_VOLUME_PATH_HERE</span>',
+-- MAGIC   format =&gt; 'csv',
+-- MAGIC   header =&gt; 'true'
+-- MAGIC )</code></pre>
+-- MAGIC         <strong style="color: #00695c;">What Each Part Does</strong>
+-- MAGIC         <ul style="margin: 8px 0 12px 0; color: #333; line-height: 1.7">
+-- MAGIC           <li><code>read_files()</code> &mdash; reads raw files from a Unity Catalog Volume or cloud storage path</li>
+-- MAGIC           <li><code>format =&gt; 'csv'</code> &mdash; specifies the file format (also supports <code>json</code>, <code>parquet</code>, <code>avro</code>)</li>
+-- MAGIC           <li><code>header =&gt; 'true'</code> &mdash; uses the first row of each CSV as column names instead of generating <code>_c0</code>, <code>_c1</code>, etc.</li>
+-- MAGIC           <li>This is the same function that powers <strong>Auto Loader</strong> when used inside a <code>CREATE STREAMING TABLE</code> statement &mdash; you will see this in Demo 2.2</li>
+-- MAGIC         </ul>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </div>
+-- MAGIC </details>
+-- MAGIC
+-- MAGIC <style>
+-- MAGIC details summary span:first-child {
+-- MAGIC   transition: transform 0.2s ease;
+-- MAGIC   display: inline-block;
+-- MAGIC }
+-- MAGIC details[open] summary span:first-child {
+-- MAGIC   transform: rotate(90deg);
+-- MAGIC }
+-- MAGIC </style>
+-- MAGIC
+-- MAGIC <script>
+-- MAGIC function copyExpandBlock() {
+-- MAGIC   const el = document.getElementById("expand-copy-block");
+-- MAGIC   if (!el) return;
+-- MAGIC   const text = el.innerText;
+-- MAGIC   if (navigator.clipboard && navigator.clipboard.writeText) {
+-- MAGIC     navigator.clipboard.writeText(text)
+-- MAGIC       .then(() => alert("Copied to clipboard"))
+-- MAGIC       .catch(err => {
+-- MAGIC         console.error("Clipboard write failed:", err);
+-- MAGIC         const textarea = document.createElement("textarea");
+-- MAGIC         textarea.value = text;
+-- MAGIC         textarea.style.position = "fixed";
+-- MAGIC         textarea.style.left = "-9999px";
+-- MAGIC         document.body.appendChild(textarea);
+-- MAGIC         textarea.select();
+-- MAGIC         try { document.execCommand("copy"); alert("Copied to clipboard"); }
+-- MAGIC         catch (e) { alert("Copy failed. Please select and copy manually."); }
+-- MAGIC         finally { document.body.removeChild(textarea); }
+-- MAGIC       });
+-- MAGIC   }
+-- MAGIC }
+-- MAGIC </script>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #16a34a; background: #f7fdf4; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#14532d; margin-bottom:6px; font-size: 1.1em;">What to Observe</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ul>
+-- MAGIC       <li>The results show the <strong>raw_products</strong> data (~200 rows) with columns like <code>product_id</code>, <code>product_name</code>, <code>category</code>, <code>brand</code>, <code>cost_price</code>, and <code>list_price</code></li>
+-- MAGIC       <li><code>read_files()</code> reads CSV data directly from the volume &mdash; this is the same function used in Demo 2.2 to create Streaming Tables</li>
+-- MAGIC       <li>Notice that <code>read_files()</code> inferred the column types automatically from the CSV data</li>
+-- MAGIC     </ul>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## C. Generate a Query with Genie Code
+-- MAGIC
+-- MAGIC Now let's see Genie Code handle something more complex. Instead of a simple `SELECT *`, you will ask it to build a multi-table join with aggregation — the kind of query that takes real effort to write by hand.
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 1 — Start a Fresh Query Tab</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>In the SQL Editor, click the <strong>+</strong> button to open a <strong>New Query</strong> tab.</li>
+-- MAGIC       <li>Make sure the same catalog is selected (<code>labuser_XXXXX</code>).</li>
+-- MAGIC     </ol>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 2 — Use Generate to Create the Query</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>Click <strong>Generate (&#x2318;+I)</strong> or press <strong>Ctrl+I</strong> to open the inline Genie Code prompt.</li>
+-- MAGIC       <li>Type a prompt like:
+-- MAGIC         <div style="margin: 8px 0; padding: 8px 12px; background: #f3f4f6; border-radius: 4px; font-style: italic;">
+-- MAGIC           "Show total revenue and number of orders by product category. Join @raw_orders and @raw_products on product_id. Order by revenue descending."
+-- MAGIC         </div>
+-- MAGIC         <ul>
+-- MAGIC           <li>Use the <strong>@</strong> symbol before each table name &mdash; a dropdown will appear. Select the correct table from your catalog each time.</li>
+-- MAGIC         </ul>
+-- MAGIC       </li>
+-- MAGIC       <li>Review the generated SQL, click <strong>Accept</strong>, then click <strong>Run all</strong>.</li>
+-- MAGIC     </ol>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #16a34a; background: #f7fdf4; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#14532d; margin-bottom:6px; font-size: 1.1em;">What to Observe</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ul>
+-- MAGIC       <li>Genie Code produced a multi-table <code>JOIN</code> with <code>GROUP BY</code> and <code>ORDER BY</code> &mdash; a query that would take real effort to write from scratch</li>
+-- MAGIC       <li>The results show revenue and order counts broken down by product category</li>
+-- MAGIC       <li>Compare the effort: in Exercise B you had to navigate Catalog Explorer, copy a volume path, and remember <code>read_files()</code> syntax for a simple read. Here you described a business question in one sentence and got a working join + aggregation</li>
+-- MAGIC       <li>Genie Code may have chosen slightly different column names or added extras like <code>AVG</code> &mdash; that is fine. The key is that it answered the business question correctly</li>
+-- MAGIC     </ul>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <div style="border-left: 4px solid #1976d2; background: #f0f7ff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#1e3a5f; margin-bottom:6px; font-size: 1.1em;">Key Takeaway &mdash; Getting the Most from Genie Code</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     Genie Code shines when you describe a business question and let it figure out the joins, groupings, and aggregations. Tips for better results:
+-- MAGIC     <ul>
+-- MAGIC       <li><strong>Use <code>@</code> to reference tables</strong> &mdash; typing <code>@raw_orders</code> anchors the prompt to the correct catalog and schema, so Genie Code reads the table metadata (column names, types, descriptions) and generates accurate SQL</li>
+-- MAGIC       <li><strong>Be specific in your prompts</strong> &mdash; include column names, join keys, and how you want results sorted. Vague prompts produce vague SQL</li>
+-- MAGIC       <li><strong>Use slash commands for existing code</strong> &mdash; <code>/explain</code> for walkthroughs, <code>/fix</code> for errors, <code>/optimize</code> for performance, <code>/doc</code> to add comments</li>
+-- MAGIC       <li><strong>Use Cmd+I for inline generation</strong> &mdash; press <strong>&#x2318;+I</strong> to invoke Genie Code right at your cursor without opening the side panel</li>
+-- MAGIC       <li><strong>Always review before running</strong> &mdash; Genie Code output is non-deterministic. Check column names, join logic, and filter conditions before you execute</li>
+-- MAGIC     </ul>
+-- MAGIC     In practice, you will use both approaches: <strong>Genie Code to draft</strong>, then <strong>manual editing to refine</strong>. For more tips, see <a href="https://www.databricks.com/blog/databricks-assistant-tips-and-tricks-data-analysts" target="_blank">Genie Code Tips and Tricks for Data Analysts</a>.
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## D. Fix a Broken Materialized View with Genie Code
+-- MAGIC
+-- MAGIC In this exercise you will create a **Materialized View** that contains an error. Instead of hunting for the bug yourself, you will use Genie Code to fix it, then explore the resulting object in Unity Catalog and the Pipelines UI.
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 1 &mdash; Copy and Run the Broken Materialized View</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>Open a <strong>New Query</strong> tab in the SQL Editor.</li>
+-- MAGIC       <li>Make sure the catalog is still set to <code>labuser_XXXXX</code>.</li>
+-- MAGIC       <li>Copy the query below and paste it into the editor, then click <strong>Run all</strong>.</li>
+-- MAGIC     </ol>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <button onclick="copyBlock()" style="margin: 8px 0; padding: 6px 14px; background: #00796b; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Copy to clipboard</button>
+-- MAGIC <pre id="copy-block" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; border:1px solid #e5e7eb; border-radius:10px; background:#1B3139; color:#E8E3DC; padding:14px 16px; font-size:0.85rem; line-height:1.35; white-space:pre;"><code>CREATE OR REPLACE MATERIALIZED VIEW default.lab_top_orders
+-- MAGIC AS
+-- MAGIC SELECT
+-- MAGIC   o.order_id,
+-- MAGIC   c.first_name || ' ' || c.last_name AS customer_name,
+-- MAGIC   p.product_name,
+-- MAGIC   p.category,
+-- MAGIC   o.order_date,
+-- MAGIC   o.quantity * o.unit_price AS line_total,
+-- MAGIC   c.customer_segment
+-- MAGIC FROM data.raw_orders o
+-- MAGIC JOIN data.raw_customers c ON o.cust_id = c.customer_id
+-- MAGIC JOIN data.raw_products p ON o.product_id = p.product_id
+-- MAGIC WHERE o.order_status = 'completed';</code></pre>
+-- MAGIC <script>
+-- MAGIC function copyBlock() {
+-- MAGIC   const el = document.getElementById("copy-block");
+-- MAGIC   if (!el) return;
+-- MAGIC   const text = el.innerText;
+-- MAGIC   if (navigator.clipboard && navigator.clipboard.writeText) {
+-- MAGIC     navigator.clipboard.writeText(text)
+-- MAGIC       .then(() => alert("Copied to clipboard"))
+-- MAGIC       .catch(err => {
+-- MAGIC         console.error("Clipboard write failed:", err);
+-- MAGIC         fallbackCopy(text);
+-- MAGIC       });
+-- MAGIC   } else {
+-- MAGIC     fallbackCopy(text);
+-- MAGIC   }
+-- MAGIC }
+-- MAGIC function fallbackCopy(text) {
+-- MAGIC   const textarea = document.createElement("textarea");
+-- MAGIC   textarea.value = text;
+-- MAGIC   textarea.style.position = "fixed";
+-- MAGIC   textarea.style.left = "-9999px";
+-- MAGIC   document.body.appendChild(textarea);
+-- MAGIC   textarea.select();
+-- MAGIC   try {
+-- MAGIC     document.execCommand("copy");
+-- MAGIC     alert("Copied to clipboard");
+-- MAGIC   } catch (err) {
+-- MAGIC     alert("Copy failed. Please select and copy manually.");
+-- MAGIC   } finally {
+-- MAGIC     document.body.removeChild(textarea);
+-- MAGIC   }
+-- MAGIC }
+-- MAGIC </script>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #16a34a; background: #f7fdf4; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#14532d; margin-bottom:6px; font-size: 1.1em;">What to Observe</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ul>
+-- MAGIC       <li>The statement <strong>fails</strong> with an error &mdash; the error message mentions a column that cannot be resolved</li>
+-- MAGIC       <li>Notice two things happened automatically:
+-- MAGIC         <ul>
+-- MAGIC           <li><strong>Genie Code Quick Fix</strong> &mdash; an inline suggestion appeared in the editor showing the corrected line (red = old, green = new). You can <strong>Accept</strong> or <strong>Reject</strong> it directly.</li>
+-- MAGIC           <li><strong>Diagnose error</strong> button &mdash; appeared in the results area next to the error message, for a deeper agent-powered analysis.</li>
+-- MAGIC         </ul>
+-- MAGIC       </li>
+-- MAGIC     </ul>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 2a &mdash; Quick Fix (Inline)</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>Look at the editor &mdash; Genie Code has already highlighted the broken line and suggested a replacement inline (shown as a diff: red for the old line, green for the fix).</li>
+-- MAGIC       <li>Click <strong>Accept</strong> to apply the quick fix, then click <strong>Run all</strong> to create the Materialized View.</li>
+-- MAGIC     </ol>
+-- MAGIC     <p>The Quick Fix is fast and automatic &mdash; it fires instantly after an error and handles straightforward issues like typos and unresolved column names.</p>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 2b &mdash; Diagnose Error (Agent-Powered)</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <p>For more complex errors, or if you want a deeper explanation:</p>
+-- MAGIC     <ol>
+-- MAGIC       <li>Click the <strong>Diagnose error</strong> button in the results area (next to the error message).</li>
+-- MAGIC       <li>Genie Code opens an agent-powered analysis &mdash; it reads the error, inspects your table schemas, and provides a detailed diagnosis with a suggested fix.</li>
+-- MAGIC       <li>Review the diagnosis, click <strong>Accept</strong> to apply, then <strong>Run all</strong>.</li>
+-- MAGIC     </ol>
+-- MAGIC     <p><strong>Diagnose error</strong> is more thorough than Quick Fix &mdash; it uses agent reasoning to handle multi-step errors, ambiguous column references, and logic issues that a simple pattern match cannot catch.</p>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <details>
+-- MAGIC   <summary style="cursor: pointer; list-style: none; user-select: none;">
+-- MAGIC     <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 16px 20px; border-radius: 4px; margin: 16px 0">
+-- MAGIC       <div style="display: flex; align-items: center; gap: 12px">
+-- MAGIC         <span style="font-size: 20px;">&#x25B6;</span>
+-- MAGIC         <strong style="color: #00695c; font-size: 1.1em;">Expand for Help</strong>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </summary>
+-- MAGIC   <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 0 20px 16px 20px; border-radius: 0 0 4px 4px; margin: -16px 0 16px 0">
+-- MAGIC     <div style="display: flex; align-items: flex-start; gap: 12px">
+-- MAGIC       <span style="font-size: 20px; visibility: hidden;">&#x25B6;</span>
+-- MAGIC       <div>
+-- MAGIC         <strong style="color: #00695c;">Corrected Query</strong>
+-- MAGIC <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; border:1px solid #00897b; border-radius:10px; background:#1B3139; color:#E8E3DC; padding:14px 16px; font-size:0.85rem; line-height:1.5; white-space:pre; margin: 8px 0;"><code>CREATE OR REPLACE MATERIALIZED VIEW default.lab_top_orders
+-- MAGIC AS
+-- MAGIC SELECT
+-- MAGIC   o.order_id,
+-- MAGIC   c.first_name || ' ' || c.last_name AS customer_name,
+-- MAGIC   p.product_name,
+-- MAGIC   p.category,
+-- MAGIC   o.order_date,
+-- MAGIC   o.quantity * o.unit_price AS line_total,
+-- MAGIC   c.customer_segment
+-- MAGIC FROM data.raw_orders o
+-- MAGIC JOIN data.raw_customers c ON o.customer_id = c.customer_id
+-- MAGIC JOIN data.raw_products p ON o.product_id = p.product_id
+-- MAGIC WHERE o.order_status = 'completed';</code></pre>
+-- MAGIC <p style="color: #333; margin: 8px 0;">The fix: <code>o.cust_id</code> &rarr; <code>o.customer_id</code></p>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </div>
+-- MAGIC </details>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #16a34a; background: #f7fdf4; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#14532d; margin-bottom:6px; font-size: 1.1em;">What to Observe</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ul>
+-- MAGIC       <li>Genie Code identified that <code>o.cust_id</code> does not exist and suggested changing it to <code>o.customer_id</code></li>
+-- MAGIC       <li>After the fix, the <code>CREATE OR REPLACE MATERIALIZED VIEW</code> completes successfully</li>
+-- MAGIC       <li>You just created <code>default.lab_top_orders</code> &mdash; a Materialized View that pre-computes enriched order data with customer and product details</li>
+-- MAGIC     </ul>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <div style="border-left: 4px solid #1976d2; background: #f0f7ff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#1e3a5f; margin-bottom:6px; font-size: 1.1em;">Key Takeaway</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     Genie Code gives you two levels of error assistance:
+-- MAGIC     <ul>
+-- MAGIC       <li><strong>Quick Fix</strong> &mdash; instant, automatic inline suggestions for common issues like typos and unresolved columns. Fast and lightweight.</li>
+-- MAGIC       <li><strong>Diagnose error</strong> &mdash; agent-powered analysis that reads the error, inspects table schemas, and explains the root cause. Use this for complex or ambiguous errors where the Quick Fix falls short.</li>
+-- MAGIC     </ul>
+-- MAGIC     Together they eliminate most manual debugging &mdash; you focus on the business logic, and Genie Code handles the syntax.
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 3 &mdash; Explore Your Materialized View in Unity Catalog</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>In the left sidebar, <strong>right-click Catalog</strong> and select <strong>Open in new tab</strong>.</li>
+-- MAGIC       <li>Navigate to your catalog &rarr; <code>default</code> schema &rarr; find <strong>lab_top_orders</strong>.</li>
+-- MAGIC       <li>Click it and explore the <strong>Overview</strong> tab:
+-- MAGIC         <ul>
+-- MAGIC           <li><strong>Table type</strong> shows <strong>Materialized View</strong></li>
+-- MAGIC           <li>Note the <strong>owner</strong>, <strong>created</strong> timestamp, and <strong>column</strong> details</li>
+-- MAGIC           <li>Scroll to <strong>Current refresh status</strong> and click the <strong>pipeline link</strong> &mdash; this takes you to the pipeline that was auto-created to manage this MV</li>
+-- MAGIC         </ul>
+-- MAGIC       </li>
+-- MAGIC       <li>Click the <strong>Lineage</strong> tab and click the <strong>See Lineage Graph</strong> button in the upper right &mdash; you can see the upstream tables (<code>raw_orders</code>, <code>raw_customers</code>, <code>raw_products</code>) that feed into this MV</li>
+-- MAGIC     </ol>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Step 4 &mdash; Find the Pipeline Under the Hood</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li>In the left sidebar, click <strong>Jobs and Pipelines</strong> on the left main menu.</li>
+-- MAGIC       <li>Find the auto-created pipeline from your <code>CREATE MATERIALIZED VIEW</code> statement.</li>
+-- MAGIC       <li>Click it &mdash; the MV appears as a node in the pipeline DAG.</li>
+-- MAGIC       <li>Note the pipeline status, run history, and configuration &mdash; all managed automatically.</li>
+-- MAGIC     </ol>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## E. Lab Summary
+-- MAGIC
+-- MAGIC In this lab you practiced four key workflows in the SQL Editor:
+-- MAGIC
+-- MAGIC | Exercise | Approach | What You Practiced |
+-- MAGIC |----------|----------|--------------------|
+-- MAGIC | **B** | Write SQL manually | Navigated Unity Catalog to find a volume path, wrote a `read_files()` query from scratch |
+-- MAGIC | **C** | Generate with Genie Code | Used a natural-language prompt to generate a multi-table join with aggregation in seconds |
+-- MAGIC | **D** | Fix with Genie Code + Explore | Used Quick Fix and Diagnose Error to fix a broken MV, then explored it in Catalog Explorer (Lineage Graph) and located the auto-created pipeline |
+-- MAGIC
+-- MAGIC These patterns — **write**, **generate**, **fix**, and **explore** — are the core workflow you will use throughout the rest of this course. If you have time, try the bonus challenges and SQL Editor scavenger hunt below.
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## F. Bonus Challenges
+-- MAGIC
+-- MAGIC Finished early? Try these challenges in the SQL Editor. Write the query yourself **or** use a Genie Code prompt — your choice. Check your answer against the expected output, then expand the help section if you get stuck.
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #1976d2; background: #e3f2fd; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#0d47a1; margin-bottom:6px; font-size: 1.1em;"><img src="../Includes/images/icons/education-icon.png" height="20" style="vertical-align:middle;"> Challenge 1 &mdash; Top 5 Biggest Spenders</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <p>Which 5 customers have spent the most money across all their orders? Show the customer name and their total spend.</p>
+-- MAGIC     <p><strong>Tables:</strong> <code>data.raw_orders</code>, <code>data.raw_customers</code></p>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <div style="border-left: 4px solid #16a34a; background: #f7fdf4; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#14532d; margin-bottom:6px; font-size: 1.1em;"><img src="../Includes/images/icons/checkmark-success.png" height="20" style="vertical-align:middle;"> Expected Output</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <table style="border-collapse: collapse; font-size: 0.9em; margin: 8px 0;">
+-- MAGIC       <tr style="background: #f7fdf4;"><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: left;">customer_name</th><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: right;">total_spend</th></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">Nicole Alvarez</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">27,468.56</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">Henry Gray</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">23,572.91</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">John James</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">23,310.63</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">Charles Gonzalez</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">22,510.46</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">Kathleen Patel</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">21,602.02</td></tr>
+-- MAGIC     </table>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <details>
+-- MAGIC   <summary style="cursor: pointer; list-style: none; user-select: none;">
+-- MAGIC     <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 16px 20px; border-radius: 4px; margin: 16px 0">
+-- MAGIC       <div style="display: flex; align-items: center; gap: 12px">
+-- MAGIC         <span style="font-size: 20px;">&#x25B6;</span>
+-- MAGIC         <strong style="color: #00695c; font-size: 1.1em;">Expand for Help</strong>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </summary>
+-- MAGIC   <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 0 20px 16px 20px; border-radius: 0 0 4px 4px; margin: -16px 0 16px 0">
+-- MAGIC     <div style="display: flex; align-items: flex-start; gap: 12px">
+-- MAGIC       <span style="font-size: 20px; visibility: hidden;">&#x25B6;</span>
+-- MAGIC       <div>
+-- MAGIC         <strong style="color: #00695c;">Query</strong>
+-- MAGIC         <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; border:1px solid #00897b; border-radius:10px; background:#1B3139; color:#E8E3DC; padding:14px 16px; font-size:0.85rem; line-height:1.5; white-space:pre; margin: 8px 0;"><code>SELECT
+-- MAGIC   c.first_name || ' ' || c.last_name AS customer_name,
+-- MAGIC   SUM(o.quantity * o.unit_price) AS total_spend
+-- MAGIC FROM data.raw_orders o
+-- MAGIC JOIN data.raw_customers c ON o.customer_id = c.customer_id
+-- MAGIC GROUP BY customer_name
+-- MAGIC ORDER BY total_spend DESC
+-- MAGIC LIMIT 5;</code></pre>
+-- MAGIC         <strong style="color: #00695c;">Genie Code Prompt</strong>
+-- MAGIC         <p style="color: #333; margin: 4px 0; font-style: italic;">"Show the top 5 customers by total spend. Join @raw_orders and @raw_customers. Calculate spend as quantity times unit_price. Show customer name and total, ordered by total descending."</p>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </div>
+-- MAGIC </details>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #1976d2; background: #e3f2fd; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#0d47a1; margin-bottom:6px; font-size: 1.1em;"><img src="../Includes/images/icons/education-icon.png" height="20" style="vertical-align:middle;"> Challenge 2 &mdash; Which Product Category Gets the Best Reviews?</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <p>Find the average customer feedback rating for each product category. Which category has the happiest customers?</p>
+-- MAGIC     <p><strong>Tables:</strong> <code>data.customer_feedback</code>, <code>data.raw_orders</code>, <code>data.raw_products</code></p>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <div style="border-left: 4px solid #16a34a; background: #f7fdf4; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#14532d; margin-bottom:6px; font-size: 1.1em;"><img src="../Includes/images/icons/checkmark-success.png" height="20" style="vertical-align:middle;"> Expected Output</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <table style="border-collapse: collapse; font-size: 0.9em; margin: 8px 0;">
+-- MAGIC       <tr style="background: #f7fdf4;"><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: left;">category</th><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: right;">avg_rating</th><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: right;">review_count</th></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">food</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">4.26</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">78</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">home</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">4.04</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">81</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">beauty</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">4.02</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">53</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">clothing</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">4.00</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">47</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">sports</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">3.97</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">70</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">electronics</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">3.96</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">79</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">books</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">3.79</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">92</td></tr>
+-- MAGIC     </table>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <details>
+-- MAGIC   <summary style="cursor: pointer; list-style: none; user-select: none;">
+-- MAGIC     <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 16px 20px; border-radius: 4px; margin: 16px 0">
+-- MAGIC       <div style="display: flex; align-items: center; gap: 12px">
+-- MAGIC         <span style="font-size: 20px;">&#x25B6;</span>
+-- MAGIC         <strong style="color: #00695c; font-size: 1.1em;">Expand for Help</strong>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </summary>
+-- MAGIC   <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 0 20px 16px 20px; border-radius: 0 0 4px 4px; margin: -16px 0 16px 0">
+-- MAGIC     <div style="display: flex; align-items: flex-start; gap: 12px">
+-- MAGIC       <span style="font-size: 20px; visibility: hidden;">&#x25B6;</span>
+-- MAGIC       <div>
+-- MAGIC         <strong style="color: #00695c;">Query</strong>
+-- MAGIC         <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; border:1px solid #00897b; border-radius:10px; background:#1B3139; color:#E8E3DC; padding:14px 16px; font-size:0.85rem; line-height:1.5; white-space:pre; margin: 8px 0;"><code>SELECT
+-- MAGIC   p.category,
+-- MAGIC   ROUND(AVG(f.rating), 2) AS avg_rating,
+-- MAGIC   COUNT(*) AS review_count
+-- MAGIC FROM data.customer_feedback f
+-- MAGIC JOIN data.raw_orders o ON f.order_id = o.order_id
+-- MAGIC JOIN data.raw_products p ON o.product_id = p.product_id
+-- MAGIC GROUP BY p.category
+-- MAGIC ORDER BY avg_rating DESC;</code></pre>
+-- MAGIC         <strong style="color: #00695c;">Genie Code Prompt</strong>
+-- MAGIC         <p style="color: #333; margin: 4px 0; font-style: italic;">"Show average feedback rating and number of reviews by product category. Join @customer_feedback to @raw_orders on order_id, then @raw_orders to @raw_products on product_id. Round the average to 2 decimals. Order by rating descending."</p>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </div>
+-- MAGIC </details>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #1976d2; background: #e3f2fd; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#0d47a1; margin-bottom:6px; font-size: 1.1em;"><img src="../Includes/images/icons/education-icon.png" height="20" style="vertical-align:middle;"> Challenge 3 &mdash; State-by-State Revenue Leaderboard</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <p>Build a leaderboard of the top 10 states by total revenue. Include the number of unique customers in each state.</p>
+-- MAGIC     <p><strong>Tables:</strong> <code>data.raw_orders</code>, <code>data.raw_customers</code></p>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <div style="border-left: 4px solid #16a34a; background: #f7fdf4; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#14532d; margin-bottom:6px; font-size: 1.1em;"><img src="../Includes/images/icons/checkmark-success.png" height="20" style="vertical-align:middle;"> Expected Output</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <table style="border-collapse: collapse; font-size: 0.9em; margin: 8px 0;">
+-- MAGIC       <tr style="background: #f7fdf4;"><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: left;">state</th><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: right;">total_revenue</th><th style="padding: 6px 14px; border: 1px solid #c8e6c9; text-align: right;">unique_customers</th></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">CA</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">1,574,206.28</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">317</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">TX</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">1,573,548.12</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">300</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">NC</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">1,035,765.81</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">168</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">FL</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">860,502.32</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">164</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">NY</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">810,837.10</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">151</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">IL</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">753,892.01</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">139</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">MN</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">483,584.44</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">81</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">OR</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">472,710.65</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">82</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">IN</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">462,932.68</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">82</td></tr>
+-- MAGIC       <tr><td style="padding: 4px 14px; border: 1px solid #e0e0e0;">MI</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">432,355.17</td><td style="padding: 4px 14px; border: 1px solid #e0e0e0; text-align: right;">76</td></tr>
+-- MAGIC     </table>
+-- MAGIC   </div>
+-- MAGIC </div>
+-- MAGIC
+-- MAGIC <details>
+-- MAGIC   <summary style="cursor: pointer; list-style: none; user-select: none;">
+-- MAGIC     <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 16px 20px; border-radius: 4px; margin: 16px 0">
+-- MAGIC       <div style="display: flex; align-items: center; gap: 12px">
+-- MAGIC         <span style="font-size: 20px;">&#x25B6;</span>
+-- MAGIC         <strong style="color: #00695c; font-size: 1.1em;">Expand for Help</strong>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </summary>
+-- MAGIC   <div style="border-left: 4px solid #009688; background: #f0faf9; padding: 0 20px 16px 20px; border-radius: 0 0 4px 4px; margin: -16px 0 16px 0">
+-- MAGIC     <div style="display: flex; align-items: flex-start; gap: 12px">
+-- MAGIC       <span style="font-size: 20px; visibility: hidden;">&#x25B6;</span>
+-- MAGIC       <div>
+-- MAGIC         <strong style="color: #00695c;">Query</strong>
+-- MAGIC         <pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; border:1px solid #00897b; border-radius:10px; background:#1B3139; color:#E8E3DC; padding:14px 16px; font-size:0.85rem; line-height:1.5; white-space:pre; margin: 8px 0;"><code>SELECT
+-- MAGIC   c.state,
+-- MAGIC   SUM(o.quantity * o.unit_price) AS total_revenue,
+-- MAGIC   COUNT(DISTINCT c.customer_id) AS unique_customers
+-- MAGIC FROM data.raw_orders o
+-- MAGIC JOIN data.raw_customers c ON o.customer_id = c.customer_id
+-- MAGIC GROUP BY c.state
+-- MAGIC ORDER BY total_revenue DESC
+-- MAGIC LIMIT 10;</code></pre>
+-- MAGIC         <strong style="color: #00695c;">Genie Code Prompt</strong>
+-- MAGIC         <p style="color: #333; margin: 4px 0; font-style: italic;">"Show top 10 states by total revenue with number of unique customers. Join @raw_orders and @raw_customers on customer_id. Revenue is quantity times unit_price. Order by revenue descending."</p>
+-- MAGIC       </div>
+-- MAGIC     </div>
+-- MAGIC   </div>
+-- MAGIC </details>
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## G. Can You Find It? &mdash; SQL Editor Scavenger Hunt
+-- MAGIC
+-- MAGIC Before you leave the SQL Editor, see how many of these features you can find. No queries needed &mdash; just click around!
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC <div style="border-left: 4px solid #1976d2; background: #e3f2fd; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#0d47a1; margin-bottom:6px; font-size: 1.1em;"><img src="../Includes/images/icons/magnify-analytics-icon.png" height="20" style="vertical-align:middle;"> How many can you find?</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     <ol>
+-- MAGIC       <li><strong>Format Query</strong> &mdash; paste any messy SQL and hit <strong>&#x2318;+Shift+F</strong>. Watch it snap into clean indentation instantly.</li>
+-- MAGIC       <li><strong>Schema Browser</strong> &mdash; find the left-panel icon that lets you browse tables and columns <em>without running a query</em>. Can you see column types?</li>
+-- MAGIC       <li><strong>Query Snippets</strong> &mdash; find the menu item under <strong>View</strong> that gives you reusable SQL templates.</li>
+-- MAGIC       <li><strong>Download results</strong> &mdash; run any query, then find the icon in the results toolbar that lets you download as CSV.</li>
+-- MAGIC       <li><strong>Add a visualization</strong> &mdash; after running a query, find the <strong>+</strong> button next to the Output tab. Can you add a bar chart?</li>
+-- MAGIC       <li><strong>/explain</strong> &mdash; open the Genie Code panel and type <code>/explain</code> on any query. What does it tell you?</li>
+-- MAGIC     </ol>
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC ## H. Cleanup
+-- MAGIC
+-- MAGIC <div style="border-left: 4px solid #d97706; background: #fff; padding: 14px 18px; border-radius: 4px; margin: 16px 0;">
+-- MAGIC   <strong style="display:block; color:#92400e; margin-bottom:6px; font-size: 1.1em;">Run Cleanup Cell</strong>
+-- MAGIC   <div style="color:#333;">
+-- MAGIC     Run the cell below to drop the Materialized View you created in this lab.
+-- MAGIC   </div>
+-- MAGIC </div>
+
+-- COMMAND ----------
+
+DROP MATERIALIZED VIEW IF EXISTS IDENTIFIER(my_catalog || '.default.lab_top_orders');
+
+-- COMMAND ----------
+
+-- MAGIC %md-sandbox
+-- MAGIC
+-- MAGIC &copy; <span id="dbx-year">2026</span> Databricks, Inc. All rights reserved.<br/>
+-- MAGIC Apache, Apache Spark, Spark and the Spark logo are trademarks of the
+-- MAGIC <a href="https://www.apache.org/">Apache Software Foundation</a>.<br/>
+-- MAGIC Apache Iceberg, Iceberg, and the Apache Iceberg logo are trademarks of the
+-- MAGIC <a href="https://www.apache.org/">Apache Software Foundation</a>.<br/>
+-- MAGIC <br/>
+-- MAGIC <a href="https://databricks.com/privacy-policy">Privacy Policy</a> |
+-- MAGIC <a href="https://databricks.com/terms-of-use">Terms of Use</a> |
+-- MAGIC <a href="https://help.databricks.com/">Support</a>
+-- MAGIC
+-- MAGIC <script>document.getElementById("dbx-year").textContent = new Date().getFullYear();</script>
