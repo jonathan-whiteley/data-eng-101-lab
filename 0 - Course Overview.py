@@ -156,8 +156,8 @@
 # MAGIC <div style="color:#333;">
 # MAGIC   <details>
 # MAGIC     <summary><strong>Cannot create a catalog?</strong></summary>
-# MAGIC     <p>If you do not have <code>CREATE CATALOG</code> permission, you can use an existing catalog by setting <code>catalog_forced</code> in the setup cell of any demo or lab.</p>
-# MAGIC     <p><strong>SQL Warehouse variant:</strong> <code>DECLARE catalog_forced STRING DEFAULT 'your_catalog_name';</code></p>
+# MAGIC     <p>If you do not have <code>CREATE CATALOG</code> permission, run the whole course against an existing catalog you own. Open <code>Includes/_config-course-catalog</code> and set the single value <code>course_catalog</code> to your catalog name. Every demo, lab, and the data-setup notebook read that one value.</p>
+# MAGIC     <p><strong>Example:</strong> <code>DECLARE OR REPLACE course_catalog STRING DEFAULT 'your_catalog_name';</code>. Leave it as <code>'NONE'</code> to keep the original auto-create <code>labuser_&lt;username&gt;</code> behavior.</p>
 # MAGIC   </details>
 # MAGIC </div>
 # MAGIC </div>

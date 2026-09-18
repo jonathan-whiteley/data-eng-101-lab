@@ -27,7 +27,7 @@ This course teaches how to build **production-ready ETL pipelines using pure SQL
 Before starting this course, ensure you have:
 - A **Databricks** workspace with Unity Catalog enabled
 - A Serverless SQL Warehouse
-- **CREATE CATALOG** permission (or a pre-provisioned Vocareum workspace)
+- **Either** `CREATE CATALOG` permission (auto-creates a per-user `labuser_<username>` catalog) **or** an existing catalog you own. To run on any workspace with no `CREATE CATALOG` rights, set `course_catalog` in `Includes/_config-course-catalog` to your catalog name (needs `USE CATALOG`, `CREATE SCHEMA`, `CREATE VOLUME`, `CREATE TABLE` on it). A pre-provisioned Vocareum workspace also works with the default.
 - Familiarity with intermediate SQL (SELECT, JOIN, GROUP BY, CAST, COALESCE, CREATE TABLE)
 - Understanding of data warehousing concepts (fact/dimension tables, star schemas, medallion architecture)
 

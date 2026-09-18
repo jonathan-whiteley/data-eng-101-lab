@@ -1,4 +1,8 @@
 -- Databricks notebook source
+-- MAGIC %run ../_config-course-catalog
+
+-- COMMAND ----------
+
 -- Create safe function for catalog name
 CREATE OR REPLACE TEMPORARY FUNCTION safe_uc_name(value STRING)
 RETURNS STRING
@@ -34,8 +38,8 @@ BEGIN
 -- 1. Declare variables
 -- =========================================
 
-  -- Leave catalog_forced as NONE to use the default labuser_yourusername catalog. 
-  -- IF you already have a catalog you want to use instead, replace NONE with your catalog name.
+  -- catalog_forced is driven by the single knob in ../_config-course-catalog (session var course_catalog).
+  -- Do NOT edit here; change the catalog in _config-course-catalog instead.
   DECLARE catalog_forced STRING DEFAULT 'NONE';
 
 
@@ -61,6 +65,9 @@ BEGIN
   SET user_email = current_user();
   SET user_name = SPLIT(user_email, '@')[0];
   SET safe_user_name = (SELECT safe_uc_name(SPLIT(current_user(), '@')[0]));
+
+  -- Pull the configured catalog from the single knob (../_config-course-catalog)
+  SET catalog_forced = COALESCE(course_catalog, 'NONE');
 
 -- ==================================================================================
 -- 3. Determine Vocareum or Non Vocareum Workspace and set and/or create catalog (Non Vocareum)
